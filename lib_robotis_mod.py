@@ -424,15 +424,17 @@ class Robotis_Servo():
 
     def receive_reply(self):
         start = self.dyn.read_serial( 2 )
-        if start != '\xff\xff':
-            raise RuntimeError('lib_robotis: Failed to receive start bytes, received: '+repr(start)+'\n')
         servo_id = self.dyn.read_serial( 1 )
+        if servo_id == '\xff':
+            servo_id = self.dyn.read_serial( 1 ) #in case of 3 heater bytes, need to read another for actual servo_id (from pydynamixel documentation)
+        if type(servo_id) is not str or len(servo_id)!=1:
+            raise RuntimeError('lib_robotis: Invalid message headers')
         if ord(servo_id) != self.servo_id:
             raise RuntimeError('lib_robotis: Incorrect servo ID received: %d\n' % ord(servo_id))
         data_len = self.dyn.read_serial( 1 )
         err = self.dyn.read_serial( 1 )
         data = self.dyn.read_serial( ord(data_len) - 2 )
-        checksum = self.dyn.read_serial( 1 ) # I'm not going to check...
+        checksum = self.dyn.read_serial( 1 ) # checksum is never actually validated
         return [ord(v) for v in data], ord(err)
         
 

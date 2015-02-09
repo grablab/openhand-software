@@ -42,7 +42,7 @@ import math
 class USB2Dynamixel_Device():
     ''' Class that manages serial port contention between servos on same bus
     '''
-    def __init__( self, dev_name = '/dev/ttyUSB0', baudrate = 57600 ):
+    def __init__( self, dev_name = '/dev/ttyUSB0', baudrate = 57142 ):
         try:
             self.dev_name = string.atoi( dev_name ) # stores the serial port as 0-based integer for Windows
         except:
@@ -63,6 +63,7 @@ class USB2Dynamixel_Device():
 
     def send_serial(self, msg):
         # It is up to the caller to acquire / release mutex
+        self.servo_dev.flushInput()		#added to remove extra bytes from input buffer
         self.servo_dev.write( msg )
 
     def read_serial(self, nBytes=1):
@@ -89,9 +90,6 @@ class USB2Dynamixel_Device():
             raise RuntimeError('lib_robotis: Serial port not found!\n')
 
 
-
-
-
 class Robotis_Servo():
     ''' Class to use a robotis RX-28 or RX-64 servo.
     '''
@@ -105,8 +103,9 @@ class Robotis_Servo():
                      better for AX / RX series.  Any of the defaults can be overloaded
                      on a servo-by-servo bases in servo_config.py
         '''
-
+        
 	self.series = series;	#record dynamixel series
+        self.return_delay = 250 * 2e-6	#default return delay
         # To change the defaults, load some or all changes into servo_config.py
         if series == 'MX':			#MX series generally has 4x the travel and maximums of RX
             defaults = {
@@ -135,29 +134,22 @@ class Robotis_Servo():
             raise RuntimeError('lib_robotis: Robotis Servo requires USB2Dynamixel!\n')
         else:
             self.dyn = USB2Dynamixel
+            self.dyn.servo_dev.flush()
 
         # ID exists on bus?
         self.servo_id = servo_id
         try:
             self.read_address(3)
-        except:
+        except Exception as inst:
             raise RuntimeError('lib_robotis: Error encountered.  Could not find ID (%d) on bus (%s), or USB2Dynamixel 3-way switch in wrong position.\n' %
                                ( servo_id, self.dyn.dev_name ))
 
         # Set Return Delay time - Used to determine when next status can be requested
         data = self.read_address( 0x05, 1)
-        self.return_delay = data[0] * 2e-6
+        self.return_delay = data[0] * 3e-6
 
-        # Set various parameters.  Load from servo_config.
         self.settings = {}
-        try:
-            import servo_config as sc
-            if sc.servo_param.has_key( self.servo_id ):
-                self.settings = sc.servo_param[ self.servo_id ]
-            else:
-                print 'Warning: servo_id ', self.servo_id, ' not found in servo_config.py.  Using defaults.'
-        except:
-            print 'Warning: servo_config.py not found.  Using defaults.'
+        #removed external servo settings file to simplify things (we usually only deal with MX or RX, and both settings are included above)
 
         # Set to default any parameter not specified in servo_config
         for key in defaults.keys():
@@ -182,7 +174,6 @@ class Robotis_Servo():
 	max_encoder = self.settings['max_encoder']
 	hi,lo = max_encoder / 256, max_encoder % 256	#addition made to reset encoder appropriately for both series
         self.write_address(0x08, [lo,hi])
-        self.apply_speed(0)	#reset speed appropriately
 
     def is_moving(self):
         ''' returns True if servo is moving.
@@ -207,29 +198,30 @@ class Robotis_Servo():
             sign etc. might vary with how the servo is mounted.
         '''
         data = self.read_address( 0x28, 2 )
-        load = data[0] + (data[1] >> 6) * 256
-        if data[1] >> 2 & 1 == 0:
-            return -1.0 * load
+        load = data[0] + data[1] * 256
+        if load>1024:
+            return 1024-load
         else:
-            return 1.0 * load
+            return load
 
-    #ADDED: current functionality only available for MX series:
+    #ADDED: current functionality only available for MX-64 series:
     def read_current(self):
         if self.series=='MX':
             data = self.read_address( 0x44, 2 )	#current spans addresses 0x44 and 0x45
-            curr = data[0] + (data[1] >> 6) * 256
-            if data[1] >> 2 & 1 == 0:
-                return -1.0 * curr
-            else:
-                return 1.0* curr
+            curr = data[0] + data[1] * 256
+            return 4.5*(curr-2048)		#in mA
         else:
             return 0.
 
     #ADDED: speed address same for both MX/RX series
     def read_speed(self):
         data = self.read_address( 0x26, 2 )
-        speed = data[0] + (data[1] >> 6) * 256
-        return speed
+        speed = data[0] + data[1] * 256
+        if speed>1024:
+            return float(1024-speed)/1024.0
+        else:
+            return float(speed)/1024.0
+
     #both moving speed in joint mode (between designated positions) as well as wheel mode (which only sets direction in operation)
     def apply_speed(self,amnt):
         amnt = max(0.,min(abs(amnt),1.0))
@@ -318,7 +310,7 @@ class Robotis_Servo():
         enc_val = data[0] + data[1] * 256
         return enc_val
 
-    #ADDED: enabling torque control mode for the MX series ONLY:
+    #ADDED: enabling torque control mode for the MX-64 series and above ONLY:
     def enable_torque_mode(self):
         if self.series=='MX':
             return self.write_address(0x46, [1])
@@ -327,16 +319,6 @@ class Robotis_Servo():
     def disable_torque_mode(self):
         if self.series=='MX':
             return self.write_address(0x46, [0])
-        else:
-            return 0
-    def read_torque(self):
-        if self.series=='MX':
-            data = self.read_address(0x47,2)
-            torque = data[0] + (data[1] >> 6) * 256
-            if data[1] >> 2 & 1 == 0:
-                return -1.0*torque
-            else:
-                return 1.0*torque
         else:
             return 0
     def apply_torque(self,amnt):
@@ -384,6 +366,9 @@ class Robotis_Servo():
         chksum = ( ~chksum ) % 256
         return chksum
 
+    def ping(self):
+        return self.read_address(self,0x01,nBytes=1)
+
     def read_address(self, address, nBytes=1):
         ''' reads nBytes from address on the servo.
             returns [n1,n2 ...] (list of parameters)
@@ -397,10 +382,11 @@ class Robotis_Servo():
             return [n1,n2 ...] (list of return parameters)
         '''
         msg = [ 0x03, address ] + data
-        #time.sleep(0.1)		#ADDED: helps with communication delays?
         return self.send_instruction( msg, self.servo_id )
 
     def send_instruction(self, instruction, id):
+        time.sleep(self.return_delay)	#helps w/ communication consistency?
+
         msg = [ id, len(instruction) + 1 ] + instruction # instruction includes the command (1 byte + parameters. length = parameters+2)
         chksum = self.__calc_checksum( msg )
         msg = [ 0xff, 0xff ] + msg + [chksum]
@@ -409,32 +395,34 @@ class Robotis_Servo():
         try:
             self.send_serial( msg )
             data, err = self.receive_reply()
-        except:
+        except Exception as inst:
             self.dyn.rel_mutex()
-            raise
+            raise RuntimeError(repr(str(inst)))
         self.dyn.rel_mutex()
         
         if err != 0:
             self.process_err( err )
-
+        
         return data
 
     def process_err( self, err ):
         raise RuntimeError('lib_robotis: An error occurred: %d\n' % err)
 
     def receive_reply(self):
-        start = self.dyn.read_serial( 2 )
+        start = self.dyn.read_serial( 2 )	#from pydynamixel: possible that these contain empty bytes
         servo_id = self.dyn.read_serial( 1 )
-        if servo_id == '\xff':
-            servo_id = self.dyn.read_serial( 1 ) #in case of 3 heater bytes, need to read another for actual servo_id (from pydynamixel documentation)
+
+        while servo_id=='\xff':
+            servo_id = self.dyn.read_serial( 1 )	#on Sparkfun USB-to-RS485 chip, more than 3 header bytes are sometimes set - apparently not an issue with the USB2Dynamixel
+
         if type(servo_id) is not str or len(servo_id)!=1:
-            raise RuntimeError('lib_robotis: Invalid message headers')
+            raise RuntimeError('lib_robotis: Invalid message headers, got servo id of type: '+repr(type(servo_id))+' and length: '+repr(len(servo_id)))
         if ord(servo_id) != self.servo_id:
-            raise RuntimeError('lib_robotis: Incorrect servo ID received: %d\n' % ord(servo_id))
+            raise RuntimeError('lib_robotis: Incorrect servo ID received')
         data_len = self.dyn.read_serial( 1 )
         err = self.dyn.read_serial( 1 )
         data = self.dyn.read_serial( ord(data_len) - 2 )
-        checksum = self.dyn.read_serial( 1 ) # checksum is never actually validated
+        checksum = self.dyn.read_serial( 1 ) 		#checksum is read but never compared...(by design, according to original lib_robotis.py)
         return [ord(v) for v in data], ord(err)
         
 
@@ -445,10 +433,6 @@ class Robotis_Servo():
         for m in msg:
             out += chr(m)
         self.dyn.send_serial( out )
-
-
-
-
 
 def find_servos(dyn):
     ''' Finds all servo IDs on the USB2Dynamixel '''
@@ -471,7 +455,7 @@ def recover_servo(dyn):
     raw_input('Make sure only one servo connected to USB2Dynamixel Device [ENTER]')
     raw_input('Disconnect power from the servo, but leave USB2Dynamixel connected to USB. [ENTER]')
 
-    dyn.servo_dev.setBaudrate( 1000000 )
+    dyn.servo_dev.setBaudrate( 57600 )
     
     print 'Get Ready.  Be ready to reconnect servo power when I say \'GO!\''
     print 'After a second, the red LED should become permanently lit.'
@@ -497,7 +481,7 @@ def recover_servo(dyn):
     print 'GO!'
 
     while True:
-        dyn.servo_dev.write('#')
+        s.write('#')
         time.sleep(0.0001)
 
 

@@ -1,4 +1,4 @@
-openhand
+Yale OpenHand Project - Software
 ========
 
 Python libraries for easy control of the Dynamixel-based OpenHand designs. These Python objects depend on a modified version of the 'lib\_robotis.py' library from Georgia Tech. The library has been updated to properly control both MX and RX series servos, as well as accounting for possible header miscues as suggested by the pydynamixel library. Each hand object has pre-tested settings for servo bounds and torque output that we routinely use in our experiments. These values may vary for different hardware implementations or assembly processes. 

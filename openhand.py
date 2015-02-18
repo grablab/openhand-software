@@ -152,7 +152,7 @@ class OpenHand():
 			print "Target Encoder: "+repr(servo.read_target_encoder())
 			print "Current Encoder: "+repr(servo.read_encoder())
 
-class GripperPP(OpenHand):
+class GR2(OpenHand):
 
 	motorDir = [1,1]
 	motorMin = [0.05,0.05]	#should always be symmetric here?
@@ -238,7 +238,7 @@ class GripperPP(OpenHand):
 		print "Final shift error: "+repr(round(abs(val-s_val),4))
 		self.hold()
 
-class Twiddler(OpenHand):
+class Model_M2(OpenHand):
 	servo_speed = 1.0
 	max_torque = 0.4
 	pos_err = 0.05	#error value for position checking
@@ -276,6 +276,24 @@ class Twiddler(OpenHand):
 		else:
 			self.moveMotor(0,amnt)
 
+class Model_M(OpenHand):
+	servo_speed = 1.0
+	max_torque = 0.4
+	
+	motorDir = [1,1]
+	motorMin = [0.05]
+	motorMax = [0.7]
+	
+	def __init__(self,port="/dev/ttyUSB0",s1=1,dyn_model="RX"):
+		OpenHand.__init__(self,port,[s1],dyn_model)
+		
+	def reset(self):
+		self.release()
+	def release(self):
+		self.moveMotor(0,self.amnt_release)
+	def close(self,amnt=0.4):
+		self.moveMotor(0,amnt)
+			
 class Model_O(OpenHand):
 	servo_speed = 1.0
 	max_torque = 0.4
@@ -297,7 +315,7 @@ class Model_O(OpenHand):
 
 
 	def reset(self):
-		self.moveMotor(0,0.5)
+		self.moveMotor(0,0.)	#moves fingers into lateral pinch mode with fingers orthogonal to thumb
 		self.release()
 
 	def release(self):

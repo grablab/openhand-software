@@ -61,12 +61,15 @@ if __name__== "__main__":
 	elif hand_model=="model_q":	#order: central pivot, finger 1, finger 2, middle pair
 		if checkServos(4,len(dyn_ids)):
 			Hand = Model_Q(port,dyn_ids[0],dyn_ids[1],dyn_ids[2],dyn_ids[3],dyn_model)
-	elif hand_model=="gpp":
+	elif hand_model=="gr2":
 		if checkServos(2,len(dyn_ids)):
-			Hand = GripperPP(port,dyn_ids[0],dyn_ids[1],dyn_model)
-	elif hand_model=="twiddler":
+			Hand = GR2(port,dyn_ids[0],dyn_ids[1],dyn_model)
+	elif hand_model=="m2":
 		if checkServos(2,len(dyn_ids)):
-			Hand = Twiddler(port,dyn_ids[0],dyn_ids[1],dyn_model)
+			Hand = Model_M2(port,dyn_ids[0],dyn_ids[1],dyn_model)
+	elif hand_model=="m":
+		if checkServos(1,len(dyn_ids)):
+			Hand = Model_M(port,dyn_ids[0],dyn_model)
 
 	if Hand is None:
 		print "[ERR] Invalid hand"

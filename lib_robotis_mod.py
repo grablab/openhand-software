@@ -77,8 +77,8 @@ class USB2Dynamixel_Device():
             # Closing the device first seems to prevent "Access Denied" errors on WinXP
             # (Conversations with Brian Wu @ MIT on 6/23/2010)
             self.servo_dev.close()  
-            self.servo_dev.setParity('N')
-            self.servo_dev.setStopbits(1)
+            self.servo_dev.parity = serial.PARITY_NONE
+            self.servo_dev.stopbits = serial.STOPBITS_ONE
             self.servo_dev.open()
 
             self.servo_dev.flushOutput()

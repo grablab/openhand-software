@@ -1,6 +1,11 @@
 Yale OpenHand Project - Software
 ========
 
+## Depricated Repository 
+As of September 2019, this repository for Openhand software control is depricated and will no longer be updated. Files will remain in the repository for Model T, Model T42, Model O, Model Q, Model M2, and Model GR2 control. The [new repository, openhand_node](https://github.com/grablab/openhand_node), currently supports the most-utilized openhands (Model O/T/T42) and provides a ROS node for simple implementaion. 
+
+
+## Getting Started
 Python 2 libraries for easy control of the Dynamixel-based OpenHand designs. These Python objects depend on a modified version of the 'lib\_robotis.py' library from Georgia Tech. The library has been updated to properly control both MX and RX series servos, as well as accounting for possible header miscues as suggested by the pydynamixel library. Each hand object has pre-tested settings for servo bounds and torque output that we routinely use in our experiments. These values may vary for different hardware implementations or assembly processes. 
 
 We also provide a set of scripts to help with hobby servo control via Pololu Maestro boards, specifically the Power HD 1501MG servo for select designs that can utilize them. The [Korg Nanokontrol board](http://www.korg.com/us/products/controllers/nanokontrol2/) is also supported as an affordable controller for both Dynamixel and hobby servos.
